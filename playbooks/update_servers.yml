@@ -1,0 +1,9 @@
+---
+- name: UPDATE SERVERS
+  hosts: servers
+  become: true
+  become_method: sudo
+  gather_facts: yes
+
+  roles:
+    - server_update

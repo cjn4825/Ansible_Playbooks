@@ -1,0 +1,8 @@
+---
+- name: Run download python script
+  command: python "{{ role_path }}/files/3560v2_download.py"
+  register: script_output
+
+- name: Show script output
+  debug:
+    var: script_output.stdout_lines

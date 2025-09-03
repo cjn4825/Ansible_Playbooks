@@ -1,0 +1,6 @@
+---
+- name: Upload 3560v2 config to tftp server by calling python file
+  hosts: localhost
+  gather_facts: no
+  roles:
+    - switch_upload

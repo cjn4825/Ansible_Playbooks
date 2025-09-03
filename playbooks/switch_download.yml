@@ -1,0 +1,7 @@
+---
+- name: Download 3560v2 config from tftp server by calling python file
+  hosts: localhost
+  gather_facts: no
+
+  roles:
+    - switch_download

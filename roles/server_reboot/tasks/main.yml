@@ -1,0 +1,5 @@
+---
+- name: Reboot pi servers
+  ansible.builtin.reboot:
+    reboot_timeout: 600
+    test_command: echo "Online..."

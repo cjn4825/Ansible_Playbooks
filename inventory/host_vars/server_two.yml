@@ -1,0 +1,9 @@
+# host_vars/server_two.yml
+vault_data: >-
+  {{ lookup('community.hashi_vault.hashi_vault',
+     'secret=secret/data/network/pi_servers/pi11 mode=values')
+  }}
+
+ansible_user: "{{ vault_data.username }}"
+ansible_ssh_pass: "{{ vault_data.password }}"
+ansible_become_pass: "{{ vault_data.password }}"
