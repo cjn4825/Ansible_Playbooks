@@ -1,0 +1,6 @@
+---
+- name: Deploy and Configure HashiCorp Vault with FreeIPA Auth
+  hosts: vault.home.lab
+
+  roles:
+    - Configure_Vault

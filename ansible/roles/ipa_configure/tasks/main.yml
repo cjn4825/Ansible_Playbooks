@@ -1,0 +1,107 @@
+---
+- name: Ensure correct hostname is set
+  hostname:
+    name: "ipa.home.lab"
+
+- name: Remove any conflicting/old mappings for ipa.home.lab in /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '.*ipa\.home\.lab.*'
+    state: absent
+
+- name: Mapping for FQDN exists in /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    line: "10.10.20.5 ipa.home.lab ipa"
+    state: present
+
+- name: Clean dnf cache to prevent stale metadata
+  ansible.builtin.command: dnf clean all
+  changed_when: false
+
+- name: Update packages
+  dnf:
+    name: '*'
+    state: latest
+    update_cache: true
+
+- name: Install FreeIPA server packages
+  dnf:
+    name:
+      - freeipa-server
+      - freeipa-server-dns
+      - firewalld
+      - python3-firewall
+    state: present
+    update_cache: true
+
+- name: Check if FreeIPA is already installed
+  stat:
+    path: /etc/ipa/default.conf
+  register: ipa_installed
+
+- name: Run unattended FreeIPA server installation
+  command: >
+    ipa-server-install --unattended
+    --realm={{ ipa_realm }}
+    --domain={{ ipa_domain }}
+    --ds-password={{ ipa_ds_password }}
+    --admin-password={{ ipa_admin_password }}
+    --setup-dns
+    --auto-forwarders
+    --no-ntp
+  when: not ipa_installed.stat.exists
+
+- name: Define custom BIND ACLs in ipa-ext.conf
+  copy:
+    src: ipa-ext.conf
+    dest: /etc/named/ipa-ext.conf
+    owner: root
+    group: named
+    mode: '0640'
+
+- name: Configure query and recursion restrictions in ipa-options-ext.conf
+  copy:
+    src: ipa-options-ext.conf
+    dest: /etc/named/ipa-options-ext.conf
+    owner: root
+    group: named
+    mode: '0640'
+
+- name: Ensure BIND DNS service is restarted to apply extension configs
+  systemd:
+    name: named
+    state: restarted
+
+- name: Ensure FreeIPA service stack is active and running
+  command: ipactl restart
+  register: ipactl_result
+  changed_when: false
+
+- name: Ensure Kerberos admin ticket is cached for CLI management
+  shell: echo "{{ ipa_admin_password }}" | kinit admin@{{ ipa_realm }}
+  register: kinit_result
+  retries: 6
+  delay: 10
+  until: kinit_result.rc == 0
+  changed_when: false
+
+- name: Ensure firewalld service is started and enabled
+  systemd:
+    name: firewalld
+    state: started
+    enabled: true
+
+- name: Ensure firewalld allows FreeIPA and DNS services
+  firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - http
+    - https
+    - dns
+    - freeipa-4
+
+# configuration here for users and hbac and more

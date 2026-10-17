@@ -1,0 +1,81 @@
+---
+- name: Configure Vault Server and Enroll in FreeIPA
+  hosts: vault.home.lab
+  become: true
+
+  vars:
+    vault_version: "1.15.2"
+    freeipa_domain: "home.lab"
+    freeipa_realm: "HOME.LAB"
+    freeipa_host: "ipa.home.lab"
+
+  tasks:
+    - name: Install FreeIPA Client package
+      ansible.builtin.dnf:
+        name: freeipa-client
+        state: present
+
+    - name: Enroll VM into FreeIPA Domain
+      ansible.builtin.command: >
+        ipa-client-install
+        --mkhomedir
+        --enable-dns-updates
+        --domain="{{ freeipa_domain }}"
+        --realm="{{ freeipa_realm }}"
+        --server="{{ freeipa_host }}"
+        --principal=admin
+        --password="{{ freeipa_admin_password }}"
+        --unattended
+      args:
+        creates: /etc/ipa/default.conf
+      no_log: true
+
+    - name: Add HashiCorp YUM/DNF repository
+      ansible.builtin.get_url:
+        url: https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+        dest: /etc/yum.repos.d/hashicorp.repo
+        mode: '0644'
+
+    - name: Install Vault package
+      ansible.builtin.dnf:
+        name: vault
+        state: present
+
+    - name: Ensure Vault data directory exists with correct permissions
+      ansible.builtin.file:
+        path: /opt/vault/data
+        state: directory
+        owner: vault
+        group: vault
+        mode: '0750'
+
+    - name: Write basic Vault storage configuration
+      ansible.builtin.copy:
+        dest: /etc/vault.d/vault.hcl
+        content: |
+          storage "file" {
+            path = "/opt/vault/data"
+          }
+
+          listener "tcp" {
+            address     = "0.0.0.0:8200"
+            tls_disable = 1 # Enable TLS via Dogtag certmonger for production
+          }
+
+          ui = true
+        mode: '0640'
+        owner: vault
+        group: vault
+      notify: Restart Vault Service
+
+    - name: Enable and start Vault service
+      ansible.builtin.systemd:
+        name: vault
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Restart Vault Service
+      ansible.builtin.systemd:
+        name: vault
+        state: restarted

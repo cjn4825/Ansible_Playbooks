@@ -1,0 +1,6 @@
+---
+- name: Download switch config from vault server
+  hosts: localhost
+
+  roles:
+    - switch_download

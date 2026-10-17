@@ -1,0 +1,6 @@
+---
+- name: Deploy and configure IPA server
+  hosts: ipa.home.lab
+
+  roles:
+    - ipa_configure

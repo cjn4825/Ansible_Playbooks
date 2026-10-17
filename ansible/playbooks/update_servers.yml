@@ -1,0 +1,6 @@
+---
+- name: update all pi servers
+  hosts: value  # update to include all hosts?
+
+  roles:
+    - server_update
