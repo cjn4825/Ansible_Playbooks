@@ -1,0 +1,41 @@
+---
+- name: Load Vault keys and root token from control node into memory
+  ansible.builtin.set_fact:
+    vault_data: >-
+      {{ lookup('file', local_keys_dir ~ '/' ~
+         inventory_hostname ~ '_keys.json') | from_json }}
+  delegate_to: localhost
+  no_log: true
+
+- name: Check current Vault sealed status
+  ansible.builtin.command: vault status -format=json
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+  register: vault_status
+  changed_when: false
+  failed_when: false
+
+- name: Unseal Vault if it is currently sealed
+  ansible.builtin.command: "vault operator unseal {{ item }}"
+  loop: "{{ vault_data.unseal_keys_b64[:3] }}"
+  environment:
+    VAULT_ADDR: "http://127.0.0.1:8200"
+  when: (vault_status.stdout | from_json).sealed | default(true)
+  no_log: true
+
+# - name: Write secrets to vault
+#   ansible.builtin.command: >
+#     vault kv put secret/home-lab
+#     db_user="admin"
+#     db_password="SuperSecurePassword123"
+#   environment:
+#     VAULT_ADDR: "http://127.0.0.1:8200"
+#     VAULT_TOKEN: "{{ vault_data.root_token }}"
+#   changed_when: true
+#   no_log: true
+
+# - name: Seal Vault
+#   ansible.builtin.command: vault operator seal
+#   environment:
+#     VAULT_ADDR: "http://127.0.0.1:8200"
+#     VAULT_TOKEN: "{{ vault_data.root_token }}"

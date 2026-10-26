@@ -3,4 +3,4 @@
   hosts: vault.home.lab
 
   roles:
-    - Configure_Vault
+    - vault_configure

@@ -1,5 +1,5 @@
 locals {
-  # IP inventory for the homelab core services
+  # IP inventory for the homelab tier 0 services
   device = {
     "ipa" = {
       name        = "ipa.home.lab"
@@ -13,9 +13,8 @@ locals {
     "proxmox" = {
       ip          = "10.10.20.10"
       socket      = "10.10.20.10:8006"
-      description = "HashiCorp Vault Server"
+      description = "Proxmox Server"
       active      = true
     }
-
   }
 }

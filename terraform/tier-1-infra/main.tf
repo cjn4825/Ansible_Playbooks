@@ -1,53 +1,78 @@
+resource "proxmox_virtual_environment_file" "vault_cloud_config" {
+  content_type = "snippets"
+  node_name    = "lab"
+  datastore_id = "local"
+
+  source_raw {
+    file_name = "vault-cloud-init.yaml"
+    data      = <<-EOF
+      #cloud-config
+      package_update: false
+      package_upgrade: false
+      manage_etc_hosts: false
+      hostname: ${local.device["vault"].name}
+
+      users:
+        - name: ansible
+          ssh_authorized_keys:
+            - ${file(pathexpand("~/.ssh/id_rsa.pub"))}
+          sudo: ['ALL=(ALL) NOPASSWD:ALL']
+          shell: /bin/bash
+      EOF
+  }
+}
+
 resource "proxmox_virtual_environment_vm" "vault_server" {
-  name      = "vault.home.lab"
+  name      = local.device["vault"].name
   node_name = "lab"
   vm_id     = 101
 
-  boot_order = ["ide2", "scsi0"]
-
-  cdrom {
-    file_id = "local:iso/Rocky-9.8-x86_64-minimal.iso"
-    interface = "ide2"
+  agent {
+    enabled = true
   }
+
+  startup {
+    order       = 2
+    up_delay    = 30
+    down_delay  = 30
+  }
+
+  disk {
+    datastore_id = "vm_pool"
+    import_from  = "local:import/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
+    size         = 32
+    interface    = "scsi0"
+  }
+
+  initialization {
+    datastore_id = "local"
+    user_data_file_id = proxmox_virtual_environment_file.vault_cloud_config.id
+
+    ip_config {
+      ipv4 {
+        address = local.device["vault"].address
+        gateway = local.device["vault"].gateway
+      }
+    }
+
+    dns {
+      domain  = "home.lab"
+      servers = [local.device["ipa"].ip]
+    }
+  }
+
   cpu {
     cores = 2
     type  = "host"
   }
+
   memory {
     dedicated = 2048
   }
 
-  initialization {
-    datastore_id = "vm_pool"
-    user_account {
-      username = "ansible"
-      keys = [trimspace(file("~/.ssh/id_rsa.pub"))]
-    }
-    ip_config {
-      ipv4 {
-        address = local.device["vault"].ip
-        gateway = local.device["vault"].gateway
-      }
-    }
-  }
-
   on_boot = true
-  startup {
-    order = "2"
-  }
-  disk {
-    datastore_id = "vm_pool"
-    size         = 20
-    interface    = "scsi0"
-  }
+
   network_device {
     bridge = "vmbr0"
   }
-}
-
-resource "freeipa_dns_record" "vault_dns" {
-  dnszoneidnsname = "home.lab"
-  idnsname        = "vault"
-  records         = [local.device["vault"].ip]
-  type            = "A"
 }
